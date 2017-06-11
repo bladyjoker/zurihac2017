@@ -24,8 +24,12 @@ data Expr = And [Expr]
   deriving Show
 
 app :: Expr -> Logic Sentence
+# bug: Empty should not be a part of Or And
 app (And exprs) = foldr andL (app Empty) (fmap app exprs)
 app (Or exprs) = foldr orL (app Empty) (fmap app exprs)
+-- app (And es) = foldr andL (app $ head es) (fmap app $ tail es)
+-- app (Or es) = foldr orL (app $ head es) (fmap app $ tail es)
+
 app (Literal c) = return [c]
 app Empty = return ""
 

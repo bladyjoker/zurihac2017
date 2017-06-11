@@ -76,7 +76,7 @@ groupExpr = do
     flags = many (choice [char 'i', char 'm', char 's', char 'U'])
     groupName = many1 (alphaNum <|> char '_')
 
-objExpr = choice [groupObj, charObj]
+objExpr = fmap And $ many1 (choice [groupObj, charObj])
   where
     groupObj = do
       ge <- groupExpr
@@ -85,13 +85,9 @@ objExpr = choice [groupObj, charObj]
       ce <- charExpr
       repOp ce
 
-conjExpr = do
-  objects <- many1 objExpr
-  return $ And objects
-
 disjExpr = do
-  conjs <- conjExpr `sepBy` char '|'
-  return $ Or conjs
+  objs <- objExpr `sepBy` char '|'
+  return $ Or objs
 
 expr = disjExpr
 
