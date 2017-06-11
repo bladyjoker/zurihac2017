@@ -10,6 +10,9 @@ type Sentence = String
 
 data Expr = And [Expr]
   | Or [Expr]
+  | Literal !Char
+  | Empty
+  | Range !Char !Char
   | Group Expr
   | ZeroOrMore Expr
   | OneOrMore Expr
@@ -18,21 +21,15 @@ data Expr = And [Expr]
   | NorMore !Int Expr
   | NorLess !Int Expr
   | Exactly !Int Expr
-  | CharC Class [Class]
-  | Empty
   deriving Show
-
-
-data Class = Literal !Char | Range !Char !Char deriving Show
 
 app :: Expr -> Logic Sentence
 app (And exprs) = foldr andL (app Empty) (fmap app exprs)
 app (Or exprs) = foldr orL (app Empty) (fmap app exprs)
-app (CharC headClass restOfClasses) = foldr orL (classL headClass) (fmap classL restOfClasses)
-  where
-    classL (Literal c) = return [c]
-    classL (Range from to) = foldr (\c ls -> return [c] `orL` ls) (classL (Literal from)) (enumFromTo (succ from) to)
+app (Literal c) = return [c]
 app Empty = return ""
+
+app (Range from to) = app $ Or (fmap Literal $ enumFromTo from to)
 
 app (OneOrMore expr) = app $ Or [expr, (And [expr, OneOrMore expr])] -- <expr>+ == <expr>|<expr><expr>+
 
@@ -65,5 +62,3 @@ orL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 orL = interleave
 andL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 andL lx ly = lx >>- (\x -> (ly >>- (\y -> return $ x ++ y)))
-
--- λ> runLogic (app (FromNtoM 1 3 (CharC (Literal 'a') []))) (\s ss -> s:ss) []
