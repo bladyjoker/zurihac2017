@@ -62,3 +62,5 @@ orL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 orL = interleave
 andL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 andL lx ly = lx >>- (\x -> (ly >>- (\y -> return $ x ++ y)))
+
+runRE2 expr = runLogic (app expr) (:) []

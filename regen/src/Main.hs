@@ -3,14 +3,15 @@ module Main where
 import System.Environment (getArgs)
 import Control.Monad.Logic
 import Control.Monad.Logic.RE2
-import Text.Parsec.Test
+import Text.Parsec.RE2 (parseRE2)
+
+parseAndGenerate string = do
+  re2 <- parseRE2 string
+  return $ runRE2 re2
+
+output (Left e) = mapM putStrLn [show e]
+output (Right sentences) = mapM putStrLn sentences
 
 main = do
   args <- getArgs
-  mapM putStrLn args
-  --runLogic (app (FromNtoM 1 3 (CharC (Literal 'a') []))) (:) []
-  mapM (\s -> do putStrLn s; putStrLn "------------") (take 500 $ runLogic (app $ Or [astar, bstar, cstar]) (:) [])
-
-astar = ZeroOrMore (Literal 'a')
-bstar = ZeroOrMore (Literal 'b')
-cstar = ZeroOrMore (Literal 'c')
+  mapM (output . parseAndGenerate) args
