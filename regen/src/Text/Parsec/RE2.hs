@@ -31,7 +31,11 @@ charExpr = choice [literalChar, anyChar, charClass]
       fromChar <- alphaNum
       option (RE2.Literal fromChar) (do { char '-'; toChar <- alphaNum; return (RE2.Range fromChar toChar)})
 
-integer = fmap read $ many1 digit
+integer = do
+  digits <- many1 digit
+  case reads digits :: [(Int, String)] of
+    [(int, _)] -> return int
+    _ -> error "Failed to parse integer."
 
 repOp expr = option expr (choice [zeroOrMore, oneOrMore, zeroOrOne, range])
   where
