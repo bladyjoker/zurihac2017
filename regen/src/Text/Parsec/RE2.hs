@@ -17,6 +17,9 @@ import Control.Monad.Logic.RE2 as RE2
 -- a - Literal 'a'
 -- . - Range '\0' '\255'
 -- [a-z!0-9] - Or [Range 'a' 'z', Literal '!', Range '0' '9']
+-- TODO: \.
+-- TODO: \[ \]
+-- TODO: [\-]
 charExpr = choice [literalChar, anyChar, charClass]
   where
     literalChar = do
@@ -24,12 +27,16 @@ charExpr = choice [literalChar, anyChar, charClass]
       return (RE2.Literal lc)
     anyChar = do
       char '.'
-      return $ RE2.Range '\0' '\255'
+      ascii <- range '\0' '\255'
+      return ascii
     charClass = do
       char '['
       classes <- many1 classExpr
       char ']'
-      return (RE2.Or classes)
+      case classes of
+        [] -> error "Empty character class."
+        [c] -> return c
+        (c:cs) -> return $ foldl RE2.Or c cs
     classExpr = do
       fromChar <- alphaNum
       option
@@ -37,8 +44,13 @@ charExpr = choice [literalChar, anyChar, charClass]
         (do
             char '-'
             toChar <- alphaNum
-            return (RE2.Range fromChar toChar)
+            r <- range fromChar toChar
+            return r
          )
+    range from to = case enumFromTo from to of
+      [] -> error "Invalid range."
+      [c] -> return $ Literal c
+      (c:cs) -> return $ foldl Or (Literal c) (fmap Literal cs)
 
 integer = do
   digits <- many1 digit
@@ -104,7 +116,14 @@ groupExpr = do
     flags = many (choice [char 'i', char 'm', char 's', char 'U'])
     groupName = many1 (alphaNum <|> char '_')
 
-objExpr = fmap And $ many1 (choice [groupObj, charObj])
+objExpr = do
+  objL <- choice [groupObj, charObj]
+  option
+    objL
+    (do
+       objR <- objExpr
+       return $ And objL objR
+        )
   where
     groupObj = do
       ge <- groupExpr
@@ -114,8 +133,14 @@ objExpr = fmap And $ many1 (choice [groupObj, charObj])
       repOp ce
 
 disjExpr = do
-  objs <- objExpr `sepBy` char '|'
-  return $ Or objs
+  objL <- objExpr
+  option
+    objL
+    (do
+       char '|'
+       disjR <- disjExpr
+       return $ Or objL disjR
+     )
 
 expr = disjExpr
 
