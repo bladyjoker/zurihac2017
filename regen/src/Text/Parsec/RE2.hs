@@ -14,6 +14,9 @@ import Control.Monad.Logic.RE2 as RE2
 -- a|b - Or [Literal 'a', Literal 'b']
 -- ab - And [Literal 'a', Literal 'b']
 
+-- a - Literal 'a'
+-- . - Range '\0' '\255'
+-- [a-z!0-9] - Or [Range 'a' 'z', Literal '!', Range '0' '9']
 charExpr = choice [literalChar, anyChar, charClass]
   where
     literalChar = do
@@ -29,13 +32,19 @@ charExpr = choice [literalChar, anyChar, charClass]
       return (RE2.Or classes)
     classExpr = do
       fromChar <- alphaNum
-      option (RE2.Literal fromChar) (do { char '-'; toChar <- alphaNum; return (RE2.Range fromChar toChar)})
+      option
+        (RE2.Literal fromChar)
+        (do
+            char '-'
+            toChar <- alphaNum
+            return (RE2.Range fromChar toChar)
+         )
 
 integer = do
   digits <- many1 digit
   case reads digits :: [(Int, String)] of
     [(int, _)] -> return int
-    _ -> error "Failed to parse integer."
+    _ -> error "Failed to parse integer." -- this should never happen.
 
 repOp expr = option expr (choice [zeroOrMore, oneOrMore, zeroOrOne, range])
   where
@@ -56,9 +65,24 @@ repOp expr = option expr (choice [zeroOrMore, oneOrMore, zeroOrOne, range])
       rop <- rangeOp
       char '}'
       return rop
-    rangeOp = do
+    rangeOp = atleastn <|> norless
+    atleastn = do
       from <- integer
-      option (Exactly from expr) (do{ char ','; option (NorMore from expr) (do{ to <- integer; return (FromNtoM from to expr)})})
+      option
+        (Exactly from expr)
+        (do
+            char ','
+            option
+              (NorMore from expr)
+              (do
+                  to <- integer
+                  return (FromNtoM from to expr)
+              )
+        )
+    norless = do
+      char ','
+      to <- integer
+      return $ NorLess to expr
 
 groupExpr = do
   char '('
