@@ -25,7 +25,8 @@ data Expr = And Expr Expr
 orL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 orL = interleave
 andL :: Logic Sentence -> Logic Sentence -> Logic Sentence
-andL lx ly = lx >>- (\x -> (ly >>- (\y -> return $ x ++ y)))
+--andL lx ly = lx >>- (\x -> (ly >>- (\y -> return $ x ++ y)))
+andL lx ly = pure (++) <*> lx <*> ly
 
 runRE2 expr = runLogic (logic expr) (:) []
 
