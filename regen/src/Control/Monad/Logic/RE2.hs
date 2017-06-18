@@ -2,7 +2,8 @@ module Control.Monad.Logic.RE2 where
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Logic (runLogic, (>>-), interleave, Logic)
+import Data.Monoid
+import Control.Monad.Logic (runLogic, (>>-), interleave, Logic, msplit)
 
 -- Enumerate sentences given a grammar G
 
@@ -25,8 +26,22 @@ data Expr = And Expr Expr
 orL :: Logic Sentence -> Logic Sentence -> Logic Sentence
 orL = interleave
 andL :: Logic Sentence -> Logic Sentence -> Logic Sentence
---andL lx ly = lx >>- (\x -> (ly >>- (\y -> return $ x ++ y)))
-andL lx ly = pure (++) <*> lx <*> ly
+andL lx ly = do
+  xsplit <- msplit lx
+  case xsplit of
+    Nothing -> mzero
+    Just (x, lxrest) -> do
+      ysplit <- msplit ly
+      case ysplit of
+        Nothing -> mzero
+        Just (y, lyrest) ->
+          return (x `mappend` y)
+          `interleave`
+          andL (return x) lyrest
+          `interleave`
+          andL lxrest (return y)
+          `interleave`
+          andL lxrest lyrest
 
 runRE2 expr = runLogic (logic expr) (:) []
 
