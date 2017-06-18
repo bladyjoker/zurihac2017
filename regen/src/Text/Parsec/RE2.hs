@@ -4,31 +4,40 @@ module Text.Parsec.RE2 where
 import Text.Parsec
 import Control.Monad.Logic.RE2 as RE2
 
--- a - Literal 'a'
--- [a-z0-9!@] - Range 'a' 'z'
--- (a) - Group (Literal 'a')
--- a* - ZeroOrMore (Literal 'a')
--- a+ - OneOrMore (Literal 'a')
--- a? - ZeroOrOne (Literal 'a')
--- a{1,3} - FromNtoM 1 3 (Literal 'a')
--- a|b - Or [Literal 'a', Literal 'b']
--- ab - And [Literal 'a', Literal 'b']
+----------------------------------------------------------
+-- Examples of how regexes are parsed into Expr:        --
+-- a - Literal "a"                                      --
+-- (a) - Group (Literal "a")                            --
+-- a* - ZeroOrMore (Literal "a")                        --
+-- a+ - OneOrMore (Literal "a")                         --
+-- a? - ZeroOrOne (Literal "a")                         --
+-- a{1,3} - FromNtoM 1 3 (Literal "a")                  --
+-- a{1,} - NorMore 1 (Literal "a")                      --
+-- a{,3} - NorLess 3 (Literal "a")                      --
+-- a{3} - Exactly 3 (Literal "a")                       --
+-- a|b - Or (Literal "a") (Literal "b")                 --
+-- ab - And (Literal "a") (Literal "b")                 --
+-- [a-b!] - Or                                          --
+--            (Or                                       --
+--               (Literal "a")                          --
+--               (Literal "b"))                         --
+--            (Literal "!")                             --
+-- . - Or (Or (Literal " ") (Or (Literal "!") (Or ...)) --
+----------------------------------------------------------
 
--- a - Literal 'a'
--- . - Range '\0' '\255'
--- [a-z!0-9] - Or [Range 'a' 'z', Literal '!', Range '0' '9']
--- TODO: \.
--- TODO: \[ \]
--- TODO: [\-]
-charExpr = choice [literalChar, anyChar, charClass]
+charExpr = choice [literalChar, anyChar, escape, charClass]
   where
     literalChar = do
       lc <- alphaNum
-      return (RE2.Literal lc)
+      return (RE2.Literal [lc])
     anyChar = do
       char '.'
-      ascii <- range '\0' '\255'
-      return ascii
+      asciiPrintable <- range '\32' '\255'
+      return asciiPrintable
+    escape = do
+      char '\\'
+      c <- choice $ fmap char ['.', '\\', '$', '^', '(', ')', '[', ']', '|', '?', '*', '+', '{', '}']
+      return $ Literal [c]
     charClass = do
       char '['
       classes <- many1 classExpr
@@ -40,7 +49,7 @@ charExpr = choice [literalChar, anyChar, charClass]
     classExpr = do
       fromChar <- alphaNum
       option
-        (RE2.Literal fromChar)
+        (RE2.Literal [fromChar])
         (do
             char '-'
             toChar <- alphaNum
@@ -49,8 +58,8 @@ charExpr = choice [literalChar, anyChar, charClass]
          )
     range from to = case enumFromTo from to of
       [] -> error "Invalid range."
-      [c] -> return $ Literal c
-      (c:cs) -> return $ foldl Or (Literal c) (fmap Literal cs)
+      [c] -> return $ Literal [c]
+      (c:cs) -> return $ foldr Or (Literal [c]) (fmap (Literal . (:[])) cs)
 
 integer = do
   digits <- many1 digit
